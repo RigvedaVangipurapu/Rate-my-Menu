@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Rate {{ item.name }} - Rate My Menu{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h2 class="mb-0">Rate This Dish</h2>
+            </div>
+            <div class="card-body">
+                <div class="mb-4">
+                    <h3>{{ item.name }}</h3>
+                    {% if item.description %}
+                    <p class="text-muted">{{ item.description }}</p>
+                    {% endif %}
+                    {% if item.price %}
+                    <p><strong>Price: ${{ "%.2f"|format(item.price) }}</strong></p>
+                    {% endif %}
+                </div>
+                
+                <form method="POST">
+                    {{ form.csrf_token }}
+                    
+                    <div class="mb-3">
+                        {{ form.rating.label(class="form-label") }}
+                        {{ form.rating(class="form-control", type="number", min="1", max="5", step="0.5") }}
+                        {% if form.rating.errors %}
+                            <div class="alert alert-danger">
+                                {% for error in form.rating.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        <div class="form-text">
+                            Rate from 1 to 5 stars
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.comment.label(class="form-label") }}
+                        {{ form.comment(class="form-control", rows="3") }}
+                        {% if form.comment.errors %}
+                            <div class="alert alert-danger">
+                                {% for error in form.comment.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        {{ form.submit(class="btn btn-primary btn-lg") }}
+                        <a href="{{ url_for('restaurant', restaurant_id=item.menu.restaurant_id) }}" 
+                           class="btn btn-outline-secondary">
+                            Back to Menu
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

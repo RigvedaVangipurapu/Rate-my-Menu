@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Rate My Menu{% endblock %}
+
+{% block content %}
+<div class="text-center mb-5">
+    <h1 class="display-4">🍽️ Welcome to Rate My Menu!</h1>
+    <p class="lead">Discover and rate your favorite dishes from local restaurants</p>
+    
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">📍 Find Restaurants Near You</h5>
+            <p class="card-text">Enter your location to find nearby restaurants</p>
+            <div class="row justify-content-center">
+                <div class="col-md-6">
+                    <form id="locationForm" class="mb-3">
+                        <div class="input-group">
+                            <input type="text" id="locationInput" class="form-control" placeholder="Enter your location">
+                            <button type="submit" class="btn btn-primary">Search</button>
+                        </div>
+                    </form>
+                    <button id="useCurrentLocation" class="btn btn-outline-primary">
+                        Use My Current Location
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    {% for restaurant in restaurants %}
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">{{ restaurant.name }}</h5>
+                {% if restaurant.address %}
+                <p class="card-text text-muted">
+                    <small>{{ restaurant.address }}</small>
+                </p>
+                {% endif %}
+                {% if restaurant.rating %}
+                <div class="mb-2">
+                    <span class="rating-stars">
+                        {% for i in range(5) %}
+                            {% if i < restaurant.rating|round %}
+                                ⭐
+                            {% else %}
+                                ☆
+                            {% endif %}
+                        {% endfor %}
+                    </span>
+                    <small class="text-muted">({{ restaurant.rating|round(1) }})</small>
+                </div>
+                {% endif %}
+                <div class="d-flex justify-content-between align-items-center">
+                    <a href="{{ url_for('restaurant', restaurant_id=restaurant.id) }}" class="btn btn-primary">
+                        View Menu & Rate
+                    </a>
+                    {% if not restaurant.menus %}
+                    <a href="{{ url_for('upload', restaurant_id=restaurant.id) }}" class="btn btn-outline-secondary">
+                        Upload Menu
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12 text-center">
+        <div class="alert alert-info">
+            <h4>No restaurants found!</h4>
+            <p>Enter your location to find nearby restaurants.</p>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<script>
+document.getElementById('locationForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const location = document.getElementById('locationInput').value;
+    // TODO: Implement geocoding to get lat/lng from location
+    // For now, we'll just reload with the current location
+    window.location.reload();
+});
+
+document.getElementById('useCurrentLocation').addEventListener('click', function() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function(position) {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            window.location.href = `/?lat=${lat}&lng=${lng}`;
+        });
+    } else {
+        alert('Geolocation is not supported by your browser');
+    }
+});
+</script>
+{% endblock %} 
