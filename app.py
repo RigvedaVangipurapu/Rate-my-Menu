@@ -6,9 +6,10 @@ from wtforms.validators import DataRequired
 import os
 from werkzeug.utils import secure_filename
 import json
-from menu_parser import parse_menu_with_ocr
+from menu_processor import MenuProcessor
 from google_places import GooglePlacesAPI
 from dotenv import load_dotenv
+import logging
 
 # Load environment variables
 load_dotenv()
@@ -21,6 +22,11 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 db = SQLAlchemy(app)
 google_places = GooglePlacesAPI()
+menu_processor = MenuProcessor()  # Initialize the menu processor
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Create uploads directory if it doesn't exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -139,39 +145,55 @@ def upload(restaurant_id):
     if form.validate_on_submit():
         menu_file = form.menu_file.data
         
-        # Save menu file
-        filename = secure_filename(menu_file.filename)
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        menu_file.save(file_path)
-        
-        # Create menu entry
-        menu = Menu(
-            restaurant_id=restaurant.id,
-            file_path=file_path,
-            source='upload'
-        )
-        db.session.add(menu)
-        db.session.commit()
-        
-        # Parse menu using OCR
-        parsed_items = parse_menu_with_ocr(file_path)
-        if parsed_items:
+        try:
+            # Save menu file
+            filename = secure_filename(menu_file.filename)
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            
+            logger.info(f"Saving uploaded file to: {file_path}")
+            menu_file.save(file_path)
+            
+            # Verify file was saved
+            if not os.path.exists(file_path):
+                raise FileNotFoundError(f"Failed to save uploaded file: {file_path}")
+            
+            # Create menu entry
+            menu = Menu(
+                restaurant_id=restaurant.id,
+                file_path=file_path,
+                source='upload'
+            )
+            db.session.add(menu)
+            db.session.commit()
+            
             try:
-                items = json.loads(parsed_items)
-                for item_data in items:
+                # Process menu using the new MenuProcessor
+                logger.info(f"Processing menu file: {file_path}")
+                text_content = menu_processor.process_menu(file_path)
+                menu_items = menu_processor.extract_menu_items(text_content)
+                
+                logger.info(f"Extracted {len(menu_items)} menu items")
+                for item_data in menu_items:
                     menu_item = MenuItem(
                         menu_id=menu.id,
-                        name=item_data.get('name', ''),
+                        name=item_data['name'],
                         description=item_data.get('description', ''),
-                        price=float(item_data.get('price', 0)) if item_data.get('price') else None
+                        price=float(item_data['price']) if item_data.get('price') else None
                     )
                     db.session.add(menu_item)
+                
                 db.session.commit()
-                flash('Menu uploaded and parsed successfully!', 'success')
-            except json.JSONDecodeError:
-                flash('Error parsing menu items. Please try again.', 'error')
-        else:
-            flash('Error processing menu. Please try again.', 'error')
+                flash('Menu uploaded and processed successfully!', 'success')
+                
+            except Exception as e:
+                logger.error(f"Error processing menu: {str(e)}")
+                db.session.delete(menu)
+                db.session.commit()
+                flash(f'Error processing menu: {str(e)}', 'error')
+            
+        except Exception as e:
+            logger.error(f"Error handling upload: {str(e)}")
+            flash(f'Error handling upload: {str(e)}', 'error')
             
         return redirect(url_for('restaurant', restaurant_id=restaurant.id))
     

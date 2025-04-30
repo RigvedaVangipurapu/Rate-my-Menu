@@ -9,13 +9,14 @@ Welcome to **Rate My Menu** - where we believe that while restaurants can be gre
 Picture this: You're at a new restaurant, staring at a menu longer than a CVS receipt. The restaurant has great reviews, but you're still playing Russian roulette with your taste buds. That's where we come in!
 
 - 🎯 **Dish-by-Dish Ratings**: No more guessing games! See exactly which dishes are worth your hard-earned money
-- 📱 **Easy Upload**: Snap a pic of the menu, and our OCR magic does the rest
+- 📱 **Smart Menu Parsing**: Our AI-powered system (Tesseract + LLaVA) automatically extracts dishes and prices from menus
 - 📍 **Nearby Restaurants**: Find and rate menus from restaurants around you
 - ⭐ **Community Driven**: Share your culinary wisdom with fellow foodies
 
 ## 🚀 Features
 
-- **Smart Menu Parsing**: Upload menus via image or PDF, and we'll extract the dishes for you
+- **AI-Powered Menu Parsing**: Combines Tesseract OCR with LLaVA (Large Language and Vision Assistant) for accurate menu extraction
+- **Smart Dish Recognition**: Automatically identifies dishes, prices, and categories
 - **Google Places Integration**: Find restaurants near you and see their menus
 - **Dish Ratings**: Rate individual menu items and leave helpful comments
 - **Top Picks**: See which dishes are crowd favorites at each restaurant
@@ -24,16 +25,17 @@ Picture this: You're at a new restaurant, staring at a menu longer than a CVS re
 
 - **Backend**: Flask
 - **Database**: SQLite
-- **OCR**: Tesseract
+- **OCR**: Tesseract + LLaVA
 - **Location Services**: Google Places API
 - **Frontend**: Bootstrap + Custom CSS
 
 ## 🍕 How It Works
 
 1. **Find a Restaurant**: Use your location or search for a specific place
-2. **View the Menu**: See what dishes are available
-3. **Rate & Review**: Share your thoughts on specific menu items
-4. **Help Others**: Your ratings help fellow foodies make better choices
+2. **Upload Menu**: Take a photo or upload a PDF of the menu
+3. **AI Processing**: Our system automatically extracts dishes and prices
+4. **Rate & Review**: Share your thoughts on specific menu items
+5. **Help Others**: Your ratings help fellow foodies make better choices
 
 ## 🚀 Getting Started
 
@@ -42,8 +44,16 @@ Picture this: You're at a new restaurant, staring at a menu longer than a CVS re
    ```bash
    pip install -r requirements.txt
    ```
-3. Set up your environment variables in `.env`
-4. Run the application:
+3. Install Tesseract OCR:
+   ```bash
+   # On macOS
+   brew install tesseract
+   
+   # On Ubuntu
+   sudo apt-get install tesseract-ocr
+   ```
+4. Set up your environment variables in `.env`
+5. Run the application:
    ```bash
    python app.py
    ```
