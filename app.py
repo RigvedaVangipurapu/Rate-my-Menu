@@ -1,8 +1,8 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
-from wtforms import StringField, FileField, FloatField, SubmitField
-from wtforms.validators import DataRequired
+from wtforms import StringField, FileField, FloatField, SubmitField, TextAreaField
+from wtforms.validators import DataRequired, NumberRange
 import os
 from werkzeug.utils import secure_filename
 import json
@@ -10,6 +10,7 @@ from menu_processor import MenuProcessor
 from google_places import GooglePlacesAPI
 from dotenv import load_dotenv
 import logging
+from flask_migrate import Migrate
 
 # Load environment variables
 load_dotenv()
@@ -21,7 +22,15 @@ app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 db = SQLAlchemy(app)
-google_places = GooglePlacesAPI()
+migrate = Migrate(app, db)
+
+# Initialize Google Places API if key is available
+try:
+    google_places = GooglePlacesAPI()
+except ValueError:
+    print("Warning: Google Places API key not found or invalid. Some features may be limited.")
+    google_places = None
+
 menu_processor = MenuProcessor()  # Initialize the menu processor
 
 # Configure logging
@@ -45,8 +54,8 @@ class Restaurant(db.Model):
 class Menu(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     restaurant_id = db.Column(db.Integer, db.ForeignKey('restaurant.id'), nullable=False)
-    file_path = db.Column(db.String(200), nullable=False)
-    source = db.Column(db.String(20))  # 'google' or 'upload'
+    file_path = db.Column(db.String(200), nullable=True)
+    source = db.Column(db.String(20))  # 'google', 'upload', or 'manual'
     items = db.relationship('MenuItem', backref='menu', lazy=True)
 
 class MenuItem(db.Model):
@@ -70,9 +79,15 @@ class RestaurantForm(FlaskForm):
     submit = SubmitField('Upload Menu')
 
 class RatingForm(FlaskForm):
-    rating = FloatField('Rating (1-5)', validators=[DataRequired()])
-    comment = StringField('Comment')
+    rating = FloatField('Rating', validators=[DataRequired(), NumberRange(min=1, max=5)])
+    comment = TextAreaField('Comment')
     submit = SubmitField('Submit Rating')
+
+class ManualItemForm(FlaskForm):
+    name = StringField('Item Name', validators=[DataRequired()])
+    description = TextAreaField('Description (Optional)')
+    price = FloatField('Price', validators=[DataRequired()])
+    submit = SubmitField('Add Item')
 
 # Initialize database
 def init_db():
@@ -118,19 +133,43 @@ def index():
 @app.route('/restaurant/<int:restaurant_id>')
 def restaurant(restaurant_id):
     restaurant = Restaurant.query.get_or_404(restaurant_id)
-    menu_items = MenuItem.query.join(Menu).filter(Menu.restaurant_id == restaurant_id).all()
+    menu_items = []
+    top_items = []
     
-    # If no menu items exist, try to get menu from Google Places
-    if not menu_items and restaurant.google_place_id:
-        menu_url = google_places.get_menu_url(restaurant.google_place_id)
-        if menu_url:
-            # TODO: Implement menu scraping from URL
-            pass
+    # Try to get menu items from Google Places first
+    if restaurant.google_place_id and google_places:
+        menu_items = google_places.get_menu_items(restaurant.google_place_id)
+        if not menu_items:
+            # If no menu items from Google, try to get menu photos
+            menu_photos = google_places.get_menu_photos(restaurant.google_place_id)
+            if menu_photos:
+                # Process menu photos using MenuProcessor
+                processor = MenuProcessor()
+                for photo in menu_photos:
+                    # Save photo temporarily
+                    temp_path = os.path.join(app.config['UPLOAD_FOLDER'], f'temp_{restaurant_id}.jpg')
+                    photo.save(temp_path)
+                    try:
+                        # Process the photo
+                        text_content = processor.process_menu(temp_path)
+                        items = processor.extract_menu_items(text_content)
+                        menu_items.extend(items)
+                    finally:
+                        # Clean up temp file
+                        if os.path.exists(temp_path):
+                            os.remove(temp_path)
     
-    # Get top 5 rated items
-    top_items = sorted(menu_items, 
-                      key=lambda x: sum(r.rating for r in x.ratings)/len(x.ratings) if x.ratings else 0,
-                      reverse=True)[:5]
+    # If still no menu items, check database
+    if not menu_items:
+        menu = Menu.query.filter_by(restaurant_id=restaurant_id).first()
+        if menu:
+            menu_items = MenuItem.query.filter_by(menu_id=menu.id).all()
+    
+    # Get top rated items
+    if menu_items:
+        top_items = sorted(menu_items, 
+                         key=lambda x: sum(r.rating for r in x.ratings)/len(x.ratings) if x.ratings else 0,
+                         reverse=True)[:5]
     
     return render_template('restaurant.html', 
                          restaurant=restaurant,
@@ -216,6 +255,38 @@ def rate_item(item_id):
         return redirect(url_for('restaurant', restaurant_id=item.menu.restaurant_id))
     
     return render_template('rate.html', item=item, form=form)
+
+@app.route('/restaurant/<int:restaurant_id>/add_item', methods=['GET', 'POST'])
+def add_menu_item(restaurant_id):
+    restaurant = Restaurant.query.get_or_404(restaurant_id)
+    form = ManualItemForm()
+    
+    if form.validate_on_submit():
+        # Create a new menu if one doesn't exist
+        menu = Menu.query.filter_by(restaurant_id=restaurant_id).first()
+        if not menu:
+            menu = Menu(
+                restaurant_id=restaurant_id,
+                source='manual',
+                file_path=None  # Explicitly set to None for manual items
+            )
+            db.session.add(menu)
+            db.session.commit()
+        
+        # Create the menu item
+        item = MenuItem(
+            menu_id=menu.id,
+            name=form.name.data,
+            description=form.description.data,
+            price=form.price.data
+        )
+        db.session.add(item)
+        db.session.commit()
+        
+        flash('Menu item added successfully!', 'success')
+        return redirect(url_for('restaurant', restaurant_id=restaurant_id))
+    
+    return render_template('add_item.html', form=form, restaurant=restaurant)
 
 if __name__ == '__main__':
     init_db()  # Initialize the database before running the app

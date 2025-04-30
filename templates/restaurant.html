@@ -11,40 +11,61 @@
 
 <div class="row">
     <div class="col-md-8">
-        <h2 class="mb-4">Menu Items</h2>
-        {% for item in menu_items %}
-        <div class="menu-item card mb-3">
-            <div class="card-body">
-                <h5 class="card-title">{{ item.name }}</h5>
-                {% if item.description %}
-                <p class="card-text">{{ item.description }}</p>
-                {% endif %}
-                {% if item.price %}
-                <p class="card-text"><strong>Price: ${{ "%.2f"|format(item.price) }}</strong></p>
-                {% endif %}
-                <div class="d-flex justify-content-between align-items-center">
-                    <div class="rating-stars">
-                        {% set avg_rating = item.ratings|map(attribute='rating')|sum / item.ratings|length if item.ratings else 0 %}
-                        {% for i in range(5) %}
-                            {% if i < avg_rating|round %}
-                                ⭐
-                            {% else %}
-                                ☆
-                            {% endif %}
-                        {% endfor %}
-                        ({{ item.ratings|length }} ratings)
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="mb-0">Menu Items</h2>
+            <a href="{{ url_for('add_menu_item', restaurant_id=restaurant.id) }}" class="btn btn-primary">
+                ➕ Add Menu Item
+            </a>
+        </div>
+        
+        {% if menu_items %}
+            {% for item in menu_items %}
+            <div class="menu-item card mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">{{ item.name }}</h5>
+                    {% if item.description %}
+                    <p class="card-text">{{ item.description }}</p>
+                    {% endif %}
+                    {% if item.price %}
+                    <p class="card-text"><strong>Price: ${{ "%.2f"|format(item.price) }}</strong></p>
+                    {% endif %}
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="rating-stars">
+                            {% set avg_rating = item.ratings|map(attribute='rating')|sum / item.ratings|length if item.ratings else 0 %}
+                            {% for i in range(5) %}
+                                {% if i < avg_rating|round %}
+                                    ⭐
+                                {% else %}
+                                    ☆
+                                {% endif %}
+                            {% endfor %}
+                            ({{ item.ratings|length }} ratings)
+                        </div>
+                        <a href="{{ url_for('rate_item', item_id=item.id) }}" class="btn btn-primary">
+                            Rate This Dish
+                        </a>
                     </div>
-                    <a href="{{ url_for('rate_item', item_id=item.id) }}" class="btn btn-primary">
-                        Rate This Dish
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="alert alert-info">
+                <h4>No menu items available yet!</h4>
+                <p>You can either:</p>
+                <ul>
+                    <li>Upload a menu photo</li>
+                    <li>Add menu items manually</li>
+                </ul>
+                <div class="d-flex gap-2">
+                    <a href="{{ url_for('upload', restaurant_id=restaurant.id) }}" class="btn btn-primary">
+                        📤 Upload Menu
+                    </a>
+                    <a href="{{ url_for('add_menu_item', restaurant_id=restaurant.id) }}" class="btn btn-outline-primary">
+                        ➕ Add Menu Item
                     </a>
                 </div>
             </div>
-        </div>
-        {% else %}
-        <div class="alert alert-info">
-            No menu items available yet. Check back soon!
-        </div>
-        {% endfor %}
+        {% endif %}
     </div>
     
     <div class="col-md-4">
